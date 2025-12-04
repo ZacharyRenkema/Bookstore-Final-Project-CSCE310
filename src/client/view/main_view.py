@@ -14,4 +14,14 @@ class MainView(QMainWindow):
         super().__init__()
         
         self.setWindowTitle("Main Window")
+        self.setMinimumSize(1200, 800)
         
+        
+        
+        
+        
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = MainView()
+    window.show()
+    sys.exit(app.exec())

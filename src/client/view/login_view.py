@@ -21,12 +21,12 @@ class LoginWindow(QMainWindow):
         self.setWindowTitle("Employee Login")
         self.setMinimumSize(400, 500)
 
-        # ---- Central widget + main layout ----
+        # Central widget + main layout ----
         central_widget = QWidget()
         main_layout = QVBoxLayout(central_widget)
         main_layout.setAlignment(Qt.AlignCenter)
 
-        # ---- Title label ----
+        # Title label ----
         title_label = QLabel("Employee Login")
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet(
@@ -34,7 +34,7 @@ class LoginWindow(QMainWindow):
         )
         main_layout.addWidget(title_label)
 
-        # ---- Form layout for Employee ID + Password ----
+        # Form layout for Employee ID + Password
         form_layout = QFormLayout()
         form_layout.setLabelAlignment(Qt.AlignRight)
         form_layout.setFormAlignment(Qt.AlignCenter)
@@ -54,7 +54,7 @@ class LoginWindow(QMainWindow):
         form_widget.setLayout(form_layout)
         main_layout.addWidget(form_widget)
 
-        # ---- Buttons row ----
+        # Buttons row 
         button_row = QHBoxLayout()
         button_row.setAlignment(Qt.AlignCenter)
 
