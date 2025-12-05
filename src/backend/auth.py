@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 auth_bp = Blueprint("auth", __name__)
 
+
 def generate_token(user: User):
     payload = {
         "sub": user.id,
@@ -14,7 +15,8 @@ def generate_token(user: User):
         "role": user.role,
         "exp": datetime.utcnow() + timedelta(hours=8),
     }
-    return jwt.encode(payload, config.JWT_SECRET, algorithm="HS256")
+    return jwt.encode(payload, config.JWT, algorithm="HS256")
+
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
@@ -27,7 +29,7 @@ def register():
 
     if not username or not email or not password:
         return jsonify({"error": "Missing Required Fields"}), 400
-    
+
     # TODO: Query for an existing username or email to ensure no duplicates
 
     # TODO: Hash password from input
@@ -37,6 +39,7 @@ def register():
     db.session.commit()
 
     return jsonify({"message": "User registered successfully"}), 201
+
 
 @auth_bp.route("/login", methods=["POST"])
 def login():

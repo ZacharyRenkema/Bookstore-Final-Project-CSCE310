@@ -1,3 +1,4 @@
+# app.py
 from flask import Flask
 from flask_bcrypt import Bcrypt
 from models import db
@@ -5,12 +6,19 @@ import config
 
 bcrypt = Bcrypt()
 
-def init_app():
+
+def create_app():
     app = Flask(__name__)
+
+    # Database config
     app.config["SQLALCHEMY_DATABASE_URI"] = config.SQLALCHEMY_DATABASE_URI
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    app.config["SECRET_KEY"] = config.SECRET_KEY
 
+    # Secrets (using your names)
+    app.config["SECRET_KEY"] = config.KEY      # Flask secret key
+    app.config["JWT_SECRET"] = config.JWT      # optional, nice to have in app.config
+
+    # Init extensions
     db.init_app(app)
     bcrypt.init_app(app)
 
@@ -27,7 +35,7 @@ def init_app():
 
 
 if __name__ == "__main__":
-    app = init_app()
+    app = create_app()
     with app.app_context():
-        db.create_all()   # creates tables if not exist
+        db.create_all()   # creates tables in your 'bookstore' DB if they don't exist
     app.run(debug=True)
