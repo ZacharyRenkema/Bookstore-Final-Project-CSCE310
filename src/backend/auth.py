@@ -3,24 +3,26 @@ from models import db, User
 from app import bcrypt
 import config
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 auth_bp = Blueprint("auth", __name__)
 
 
 def generate_token(user: User):
+    exp = datetime.now(timezone.utc) + timedelta(hours=8)
+
     payload = {
-        "sub": user.id,
+        "sub": str(user.id),          # <-- STRING, not int
         "username": user.username,
         "role": user.role,
-        "exp": datetime.utcnow() + timedelta(hours=8),
+        "exp": exp,
     }
+
     return jwt.encode(payload, config.JWT, algorithm="HS256")
 
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
-    # Retrieve data from registration page
     data = request.get_json() or {}
     username = data.get("username")
     email = data.get("email")
@@ -30,9 +32,13 @@ def register():
     if not username or not email or not password:
         return jsonify({"error": "Missing Required Fields"}), 400
 
-    # TODO: Query for an existing username or email to ensure no duplicates
+    # prevent duplicate usernames / emails
+    existing = User.query.filter(
+        (User.username == username) | (User.email == email)
+    ).first()
+    if existing:
+        return jsonify({"error": "Username or email already in use"}), 400
 
-    # TODO: Hash password from input
     pw_hash = bcrypt.generate_password_hash(password).decode("utf-8")
     user = User(username=username, email=email, password_hash=pw_hash, role=role)
     db.session.add(user)
@@ -47,9 +53,20 @@ def login():
     username = data.get("username")
     password = data.get("password")
 
+    if not username or not password:
+        return jsonify({"error": "Missing credentials"}), 400
+
     user = User.query.filter_by(username=username).first()
     if not user or not bcrypt.check_password_hash(user.password_hash, password):
         return jsonify({"error": "Invalid credentials"}), 401
 
     token = generate_token(user)
-    return jsonify({"token": token, "role": user.role, "username": user.username})
+
+    # This shape is what your login_view is expecting
+    return jsonify(
+        {
+            "token": token,
+            "role": user.role,
+            "username": user.username,
+        }
+    ), 200
