@@ -4,7 +4,6 @@ from app import create_app
 from models import db, Book
 
 
-# A mix of fiction, non-fiction, and tech titles with plausible authors.
 BOOK_DATA = [
     ("Edge of the Tides", "Marisa Holloway"),
     ("Fragments of Yesterday", "Daniel K. Mercer"),

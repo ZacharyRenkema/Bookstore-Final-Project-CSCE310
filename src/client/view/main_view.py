@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 from PySide6.QtCore import Qt
+from pathlib import Path
 
 API_BASE_URL = "http://127.0.0.1:5000"
 
@@ -310,9 +311,20 @@ class MainView(QMainWindow):
         self.refresh_cart_table()
         self.update_cart_label()
 
+def load_stylesheet(app: QApplication):
+    # folder where *this* file lives (manager/)
+    base_dir = Path(__file__).resolve().parent
+    style_path = base_dir / "resources" / "style.qss"
+
+    try:
+        with style_path.open("r", encoding="utf-8") as f:
+            app.setStyleSheet(f.read())
+    except FileNotFoundError:
+        print(f"style.qss not found at {style_path}, running without custom stylesheet")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    load_stylesheet(app)
     window = MainView(username="Alice", token=None)
     window.show()
     sys.exit(app.exec())

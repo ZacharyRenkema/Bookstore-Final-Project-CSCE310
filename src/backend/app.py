@@ -14,9 +14,8 @@ def create_app():
     app.config["SQLALCHEMY_DATABASE_URI"] = config.SQLALCHEMY_DATABASE_URI
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-    # Secrets (using your names)
-    app.config["SECRET_KEY"] = config.KEY      # Flask secret key
-    app.config["JWT_SECRET"] = config.JWT      # optional, nice to have in app.config
+    app.config["SECRET_KEY"] = config.KEY      
+    app.config["JWT_SECRET"] = config.JWT      
 
     # Init extensions
     db.init_app(app)
@@ -37,5 +36,5 @@ def create_app():
 if __name__ == "__main__":
     app = create_app()
     with app.app_context():
-        db.create_all()   # creates tables in your 'bookstore' DB if they don't exist
+        db.create_all()   
     app.run(debug=True)

@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QComboBox,
 )
 from PySide6.QtCore import Qt
+from pathlib import Path
 
 from main_view import MainView
 
@@ -239,8 +240,6 @@ class LoginWindow(QMainWindow):
             token = data.get("token")
             logged_in_username = data.get("username")
 
-            # print("DEBUG TOKEN FROM LOGIN:", token)  # optional debug
-
             self.main_view = MainView(
                 username=logged_in_username,
                 token=token,
@@ -255,9 +254,19 @@ class LoginWindow(QMainWindow):
                 error_msg = f"Login failed ({resp.status_code})."
             QMessageBox.warning(self, "Error", error_msg)
 
+def load_stylesheet(app: QApplication):
+    base_dir = Path(__file__).resolve().parent
+    style_path = base_dir / "resources" / "style.qss"
+
+    try:
+        with style_path.open("r", encoding="utf-8") as f:
+            app.setStyleSheet(f.read())
+    except FileNotFoundError:
+        print(f"style.qss not found at {style_path}, running without custom stylesheet")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    load_stylesheet(app)
     window = LoginWindow()
     window.show()
     sys.exit(app.exec())

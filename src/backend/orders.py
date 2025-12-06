@@ -22,6 +22,8 @@ def serialize_order(order: Order) -> dict:
     return {
         "id": order.id,
         "user_id": order.user_id,
+        "customer_username": order.user.username if order.user else None,
+        "customer_email": order.user.email if order.user else None,
         "status": order.status,
         "created_at": order.created_at.isoformat() if order.created_at else None,
         "items": [

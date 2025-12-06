@@ -1,0 +1,6 @@
+Flask
+Flask-Bcrypt
+Flask-SQLAlchemy
+PyMySQL
+PySide6
+requests
