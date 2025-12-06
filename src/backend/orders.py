@@ -1,21 +1,29 @@
 from flask import Blueprint, request, jsonify
 from models import db, Book, Order, OrderItem
 from utils import get_current_user
-from datetime import datetime, timezone
-import os
 import smtplib
 from email.message import EmailMessage
 
 orders_bp = Blueprint("orders", __name__)
 
+SMTP_HOST = "zachary.renkema2005@gmail.com"
+SMTP_PORT = 587
+SMTP_USER = "zachary.renkema2005@gmail.com"
+SMTP_PASS = "moltonmilk123"
+SMTP_FROM = SMTP_USER
 
-def serialize_order(order):
+
+def compute_order_total(order: Order) -> float:
+    return sum(float(item.unit_price) * (item.quantity or 1) for item in order.items)
+
+
+def serialize_order(order: Order) -> dict:
+    total = compute_order_total(order)
     return {
         "id": order.id,
         "user_id": order.user_id,
-        "created_at": order.created_at.isoformat() if order.created_at else None,
         "status": order.status,
-        "total_amount": float(order.total_amount) if getattr(order, "total_amount", None) is not None else None,
+        "created_at": order.created_at.isoformat() if order.created_at else None,
         "items": [
             {
                 "id": item.id,
@@ -28,20 +36,17 @@ def serialize_order(order):
             }
             for item in order.items
         ],
+        "total_amount": float(total),
     }
 
 
-def send_bill_email(order):
+def send_bill_email(order: Order) -> None:
     user = order.user
     if not user or not user.email:
         return
-    smtp_host = os.getenv("SMTP_HOST")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_pass = os.getenv("SMTP_PASS")
-    from_addr = os.getenv("SMTP_FROM", smtp_user or "no-reply@example.com")
-    if not smtp_host or not smtp_user or not smtp_pass:
-        return
+
+    total = compute_order_total(order)
+
     lines = []
     lines.append(f"Order ID: {order.id}")
     lines.append(f"Customer: {user.username} <{user.email}>")
@@ -50,22 +55,24 @@ def send_bill_email(order):
     lines.append("Items:")
     for item in order.items:
         title = item.book.title if item.book else ""
-        kind = item.kind
-        qty = item.quantity
+        qty = item.quantity or 1
         price = float(item.unit_price)
-        lines.append(f"- {title} ({kind}) x {qty} @ {price:.2f}")
+        lines.append(f"- {title} ({item.kind}) x{qty} @ {price:.2f}")
     lines.append("")
-    lines.append(f"Total: {float(order.total_amount):.2f}")
+    lines.append(f"Total amount due: {total:.2f}")
+
     body = "\n".join(lines)
+
     msg = EmailMessage()
     msg["Subject"] = f"Your Bookstore Order #{order.id}"
-    msg["From"] = from_addr
+    msg["From"] = SMTP_FROM
     msg["To"] = user.email
     msg.set_content(body)
+
     try:
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
             server.starttls()
-            server.login(smtp_user, smtp_pass)
+            server.login(SMTP_USER, SMTP_PASS)
             server.send_message(msg)
     except Exception:
         return
@@ -79,59 +86,51 @@ def create_order():
 
     data = request.get_json() or {}
     items_data = data.get("items") or []
-
     if not items_data:
         return jsonify({"error": "No items provided"}), 400
 
-    books_map = {}
-    order_items = []
-    total = 0.0
+    order = Order(user_id=user.id, status="Pending")
 
     for item in items_data:
-        book_id = item.get("book_id")
-        kind = item.get("kind")
+        book_id = item.get("book_id") or item.get("id")
+        item_kind = item.get("kind") or item.get("type")
         quantity = item.get("quantity", 1)
 
-        if not book_id or kind not in ("buy", "rent"):
-            return jsonify({"error": "Invalid item data"}), 400
+        try:
+            if book_id is not None:
+                book_id = int(book_id)
+        except (TypeError, ValueError):
+            return jsonify({"error": "Invalid book_id type", "item": item}), 400
+
+        if not book_id or item_kind not in ("buy", "rent"):
+            return jsonify({"error": "Invalid item data", "item": item}), 400
+
+        try:
+            quantity = int(quantity)
+        except (TypeError, ValueError):
+            return jsonify({"error": "Invalid quantity", "item": item}), 400
 
         if quantity <= 0:
-            return jsonify({"error": "Quantity must be positive"}), 400
+            return jsonify({"error": "Quantity must be positive", "item": item}), 400
 
-        if book_id not in books_map:
-            book = Book.query.get(book_id)
-            if not book:
-                return jsonify({"error": f"Book not found: {book_id}"}), 400
-            books_map[book_id] = book
-        else:
-            book = books_map[book_id]
+        book = Book.query.get(book_id)
+        if not book:
+            return jsonify({"error": f"Book not found: {book_id}"}), 400
 
-        if kind == "buy":
+        if item_kind == "buy":
             unit_price = float(book.buy_price)
         else:
             unit_price = float(book.rent_price)
 
-        line_total = unit_price * quantity
-        total += line_total
-
-        oi = OrderItem(
+        order_item = OrderItem(
             book_id=book.id,
+            kind=item_kind,
             quantity=quantity,
-            kind=kind,
             unit_price=unit_price,
         )
+        order.items.append(order_item)
 
-        order_items.append(oi)
-
-    order = Order(
-        user_id=user.id,
-        created_at=datetime.now(timezone.utc),
-        status="Pending",
-        total_amount=total,
-    )
-
-    for oi in order_items:
-        order.items.append(oi)
+    order.total_amount = compute_order_total(order)
 
     db.session.add(order)
     db.session.commit()
@@ -148,15 +147,19 @@ def list_orders():
         return jsonify({"error": "Unauthorized"}), 401
 
     if user.role == "manager":
-        orders = Order.query.order_by(Order.created_at.desc()).all()
+        orders = Order.query.order_by(Order.id.desc()).all()
     else:
-        orders = Order.query.filter_by(user_id=user.id).order_by(Order.created_at.desc()).all()
+        orders = (
+            Order.query.filter_by(user_id=user.id)
+            .order_by(Order.id.desc())
+            .all()
+        )
 
     return jsonify([serialize_order(o) for o in orders])
 
 
 @orders_bp.route("/<int:order_id>/status", methods=["PATCH"])
-def update_status(order_id):
+def update_payment_status(order_id: int):
     user = get_current_user()
     if not user:
         return jsonify({"error": "Unauthorized"}), 401
@@ -166,7 +169,6 @@ def update_status(order_id):
 
     data = request.get_json() or {}
     new_status = data.get("status")
-
     if new_status not in ("Pending", "Paid"):
         return jsonify({"error": "Invalid status"}), 400
 
